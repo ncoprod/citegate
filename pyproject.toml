@@ -1,0 +1,20 @@
+[project]
+name = "citegate"
+version = "0.1.0"
+description = "Refuse any answer that cannot be traced word for word to a valid source"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+citegate = "citegate.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 120
