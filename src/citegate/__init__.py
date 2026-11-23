@@ -19,6 +19,13 @@ MIN_QUOTE_CHARS = 20
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
 
+def _figures(text: str) -> list[str]:
+    """Numbers in a text, except codes with a letter glued on both sides (B2B, B2C, P2P).
+    Form 10F, G20 or EUR 750m still count as figures."""
+    return [m.group() for m in _NUMBER.finditer(text)
+            if not (m.start() > 0 and text[m.start() - 1].isalpha() and m.end() < len(text) and text[m.end()].isalpha())]
+
+
 def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
@@ -114,8 +121,8 @@ def gate_mode(i, s, sources, today):
 def gate_figures(i, s, sources, today):
     """Every number in the sentence (rate, amount, date, article) must appear in one of its quotes."""
     quoted = " ".join(c.quote for c in s.citations)
-    have = set(_NUMBER.findall(quoted))
-    missing = [n for n in _NUMBER.findall(s.text) if n not in have]
+    have = set(_figures(quoted))
+    missing = [n for n in _figures(s.text) if n not in have]
     return [f"figure {n} is not in the quoted text" for n in missing]
 
 

@@ -83,3 +83,15 @@ def test_one_bad_sentence_refuses_the_answer():
     good = Sentence("A 10% withholding applies.", [cite("subject to a 10% withholding")])
     bad = Sentence("No certificate is needed.", [])
     assert not check([good, bad], SRC, TODAY).accepted
+
+
+def test_codes_like_b2c_are_not_figures():
+    src = {"m": Source("m", {"p1": "Supplies of software to consumers are taxed where the customer lives."})}
+    ok = check([Sentence("B2C software supplies are taxed where the customer lives.",
+                         [Citation("m", "p1", "Supplies of software to consumers are taxed where the customer lives")])],
+               src, date(2026, 1, 1))
+    assert ok.accepted, ok.failures
+    bad = check([Sentence("Form 10F is required.",
+                          [Citation("m", "p1", "Supplies of software to consumers are taxed where the customer lives")])],
+                src, date(2026, 1, 1))
+    assert not bad.accepted
