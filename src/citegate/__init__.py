@@ -2,8 +2,9 @@
 
 A gate never fixes an answer; it only accepts it or says why it must go to a human.
 The gates check provenance (the quote exists, in this version, in a usable source), and that
-every figure in a sentence appears in what it quotes. They do not prove that the sentence is a
-correct reading of the quote: that is the human reviewer's job.
+every figure in a sentence appears in what it quotes (digits or words), and that a sentence is not negative
+when its quotes are positive or the reverse. They do not prove that the sentence is a correct reading of the
+quote: that is the human reviewer's job.
 """
 from __future__ import annotations
 
@@ -13,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 
-__all__ = ["DEFAULT_GATES", "Citation", "Sentence", "Source", "Verdict", "check", "version_of"]
+__all__ = ["DEFAULT_GATES", "STRICT_GATES", "Citation", "Sentence", "Source", "Verdict", "check", "version_of"]
 
 MIN_QUOTE_CHARS = 20
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
@@ -26,6 +27,47 @@ def _figures(text: str) -> list[str]:
     """Numbers in a text. Only whole-word codes of one capital, one digit, one capital (B2B, B2C, P2P) are
     left out; anything else with a digit (Form 10F, G20, EUR 750m) is a figure that must be in the quote."""
     return _NUMBER.findall(_CODE.sub(" ", text))
+
+
+_UNITS = {
+    # English
+    "zero": 0, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+    "eighteen": 18, "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
+    "eighty": 80, "ninety": 90, "hundred": 100, "thousand": 1000, "million": 1000000,
+    # French ("un/une/one" are left out: they are mostly articles)
+    "zéro": 0, "deux": 2, "trois": 3, "quatre": 4, "cinq": 5, "sept": 7, "huit": 8, "neuf": 9, "dix": 10,
+    "onze": 11, "douze": 12, "treize": 13, "quatorze": 14, "quinze": 15, "seize": 16, "vingt": 20, "trente": 30,
+    "quarante": 40, "cinquante": 50, "soixante": 60, "cent": 100, "mille": 1000,
+}
+_TENS = {k for k, v in _UNITS.items() if v in (20, 30, 40, 50, 60, 70, 80, 90)}
+_WORD = re.compile(r"[^\W\d_]+(?:-[^\W\d_]+)*")
+
+
+def _number_words(text: str) -> list[str]:
+    """Numbers written in words ("twenty", "forty-five", "quinze"), as digits, so they are checked like figures."""
+    out = []
+    for w in _WORD.findall(text.lower()):
+        parts = w.split("-")
+        if all(p in _UNITS for p in parts):
+            if len(parts) == 2 and parts[0] in _TENS and _UNITS[parts[1]] < 10:
+                out.append(str(_UNITS[parts[0]] + _UNITS[parts[1]]))
+            else:
+                out += [str(_UNITS[p]) for p in parts]
+    return out
+
+
+_NEGATION = re.compile(
+    r"\b(not|no|never|none|nor|cannot|can't|isn't|aren't|doesn't|don't|won't|without|except|unless"
+    r"|ne|n'|pas|jamais|aucun|aucune|ni|sans|sauf"
+    r"|nicht|kein|keine|keinen|nie|ohne|außer"
+    r"|nunca|ningún|ninguna|sin|salvo"
+    r"|non|mai|nessun|nessuna|senza|tranne)\b",
+    re.IGNORECASE)
+
+
+def _negative(text: str) -> bool:
+    return bool(_NEGATION.search(text.replace("’", "'")))
 
 
 def _norm(text: str) -> str:
@@ -124,8 +166,43 @@ def gate_figures(i, s, sources, today):
     """Every number in the sentence (rate, amount, date, article) must appear in one of its quotes."""
     quoted = " ".join(c.quote for c in s.citations)
     have = set(_figures(quoted))
-    missing = [n for n in _figures(s.text) if n not in have]
-    return [f"figure {n} is not in the quoted text" for n in missing]
+    have |= set(_number_words(quoted))
+    missing = [n for n in _figures(s.text) + _number_words(s.text) if n not in have]
+    return [f"figure {n} is not in the quoted text" for n in dict.fromkeys(missing)]
+
+
+def gate_negation(i, s, sources, today):
+    """A sentence cannot say the opposite of what it quotes: if one is negative (not, ne...pas, nicht, sin...),
+    the other must be too. Coarse on purpose: a false refusal sends the question to a human, never the reverse."""
+    if not s.citations:
+        return []
+    quotes_negative = any(_negative(c.quote) for c in s.citations)
+    if _negative(s.text) and not quotes_negative:
+        return ["the sentence is negative but none of its quotes is"]
+    if quotes_negative and not _negative(s.text) and all(_negative(c.quote) for c in s.citations):
+        return ["every quote is negative but the sentence is not"]
+    return []
+
+
+_END = ".!?;:"
+
+
+def gate_whole_sentence(i, s, sources, today):
+    """Optional, stricter: each quote must start and end on a sentence boundary of the passage, so a quote
+    cannot drop the condition or the date that changes its meaning ("Before 2024, the rate was 10%")."""
+    out = []
+    for c in s.citations:
+        src = sources.get(c.source_id)
+        text = _norm(src.passages.get(c.passage_id, "")) if src else ""
+        q = _norm(c.quote).rstrip(_END + " ")
+        at = text.find(q)
+        if at < 0:
+            continue  # the verbatim gate reports it
+        before = text[:at].rstrip()
+        after = text[at + len(q):].lstrip()
+        if (before and before[-1] not in _END) or (after and after[0] not in _END):
+            out.append(f"quote from {c.source_id}/{c.passage_id} is not a whole sentence")
+    return out
 
 
 DEFAULT_GATES: dict[str, Gate] = {
@@ -136,7 +213,9 @@ DEFAULT_GATES: dict[str, Gate] = {
     "valid": gate_valid,
     "mode": gate_mode,
     "figures": gate_figures,
+    "negation": gate_negation,
 }
+STRICT_GATES: dict[str, Gate] = DEFAULT_GATES | {"whole_sentence": gate_whole_sentence}
 
 
 def check(sentences: list[Sentence], sources: dict[str, Source], today: date | None = None,

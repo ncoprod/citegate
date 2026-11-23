@@ -13,10 +13,12 @@ the right version of the decision. Here, any answer made of sentences, each citi
 | `version` | the quote was taken from an older version of the source |
 | `valid` | the source has expired |
 | `mode` | the source is `contact_only` (its author did not allow automatic answers) |
-| `figures` | the sentence contains a number (rate, amount, date) absent from its quotes |
+| `figures` | the sentence contains a number (rate, amount, date, also written in words: "twenty") absent from its quotes |
+| `negation` | the sentence is negative (not, ne…pas, nicht, sin…) while its quotes are not, or the reverse |
+| `whole_sentence` (strict mode only, `STRICT_GATES`) | a quote is cut mid-sentence, which could drop a condition or a date |
 
 **What it does not do:** check that a sentence is a correct reading of its quote. The gates only
-stop unproven answers. A refused answer goes to a human with the list of reasons.
+stop unproven answers, and the negation check is deliberately coarse (a false refusal goes to a human, never the reverse). A refused answer goes to a human with the list of reasons.
 
 ```bash
 uv run pytest -q                                   # traps

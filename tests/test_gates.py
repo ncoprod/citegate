@@ -95,3 +95,31 @@ def test_codes_like_b2c_are_not_figures():
                           [Citation("m", "p1", "Supplies of software to consumers are taxed where the customer lives")])],
                 src, date(2026, 1, 1))
     assert not bad.accepted
+
+
+def test_negation_flip_is_refused():
+    src = {"m": Source("m", {"p1": "The exemption does not apply to SaaS sold to consumers."})}
+    flip = [Sentence("The exemption applies to SaaS.", [Citation("m", "p1", "The exemption does not apply to SaaS")])]
+    same = [Sentence("L'exonération ne s'applique pas au SaaS.",
+                     [Citation("m", "p1", "The exemption does not apply to SaaS")])]
+    assert not check(flip, src, date(2026, 1, 1)).accepted
+    assert check(same, src, date(2026, 1, 1)).accepted
+
+
+def test_numbers_in_words_are_figures():
+    src = {"m": Source("m", {"p1": "Since 2024 the rate is 20% for all digital services."})}
+    wrong = [Sentence("The rate is twenty-five percent.", [Citation("m", "p1", "Since 2024 the rate is 20%")])]
+    right = [Sentence("The rate is twenty percent.", [Citation("m", "p1", "Since 2024 the rate is 20%")])]
+    assert not check(wrong, src, date(2026, 1, 1)).accepted
+    assert check(right, src, date(2026, 1, 1)).accepted
+
+
+def test_strict_mode_refuses_a_clipped_quote():
+    from citegate import STRICT_GATES
+    src = {"m": Source("m", {"p1": "Before 2024, the reduced rate was 10% for e-books. Since 2024 the rate is 20%."})}
+    clipped = [Sentence("The rate is 10%.", [Citation("m", "p1", "the reduced rate was 10% for e-books")])]
+    whole = [Sentence("Before 2024 the rate was 10%.",
+                      [Citation("m", "p1", "Before 2024, the reduced rate was 10% for e-books.")])]
+    assert check(clipped, src, date(2026, 1, 1)).accepted  # default gates: provenance only
+    assert not check(clipped, src, date(2026, 1, 1), STRICT_GATES).accepted
+    assert check(whole, src, date(2026, 1, 1), STRICT_GATES).accepted
