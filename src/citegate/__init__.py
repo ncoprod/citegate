@@ -19,11 +19,13 @@ MIN_QUOTE_CHARS = 20
 _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 
 
+_CODE = re.compile(r"(?<![^\W_])[A-Z]\d[A-Z](?![^\W_])")  # whole-word B2B, B2C, P2P, B2G
+
+
 def _figures(text: str) -> list[str]:
-    """Numbers in a text, except codes with a letter glued on both sides (B2B, B2C, P2P).
-    Form 10F, G20 or EUR 750m still count as figures."""
-    return [m.group() for m in _NUMBER.finditer(text)
-            if not (m.start() > 0 and text[m.start() - 1].isalpha() and m.end() < len(text) and text[m.end()].isalpha())]
+    """Numbers in a text. Only whole-word codes of one capital, one digit, one capital (B2B, B2C, P2P) are
+    left out; anything else with a digit (Form 10F, G20, EUR 750m) is a figure that must be in the quote."""
+    return _NUMBER.findall(_CODE.sub(" ", text))
 
 
 def _norm(text: str) -> str:
