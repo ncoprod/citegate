@@ -123,3 +123,20 @@ def test_strict_mode_refuses_a_clipped_quote():
     assert check(clipped, src, date(2026, 1, 1)).accepted  # default gates: provenance only
     assert not check(clipped, src, date(2026, 1, 1), STRICT_GATES).accepted
     assert check(whole, src, date(2026, 1, 1), STRICT_GATES).accepted
+
+
+def test_negation_is_read_in_the_corpus_languages():
+    src = {"m": Source("m", {"p1": "Het enkele feit dat een werknemer thuis werkt, is niet voldoende.",
+                             "p2": "Interest paid to an affiliate is deductible only if the recipient is taxed enough."})}
+    nl = [Sentence("Working from home is not enough by itself.",
+                   [Citation("m", "p1", "Het enkele feit dat een werknemer thuis werkt, is niet voldoende")])]
+    only_if = [Sentence("Interest to an affiliate is not deductible unless the recipient is taxed enough.",
+                        [Citation("m", "p2", "deductible only if the recipient is taxed enough")])]
+    assert check(nl, src, date(2026, 1, 1)).accepted
+    assert check(only_if, src, date(2026, 1, 1)).accepted
+
+
+def test_negation_gate_does_not_guess_on_scripts_it_cannot_read():
+    src = {"m": Source("m", {"p1": "外国企業は日本で消費税の登録が必要です。登録番号を請求書に記載します。"})}
+    s = [Sentence("A foreign company does not need to wait.", [Citation("m", "p1", "外国企業は日本で消費税の登録が必要です。登録番号")])]
+    assert check(s, src, date(2026, 1, 1)).accepted

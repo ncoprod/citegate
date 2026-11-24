@@ -59,15 +59,23 @@ def _number_words(text: str) -> list[str]:
 
 _NEGATION = re.compile(
     r"\b(not|no|never|none|nor|cannot|can't|isn't|aren't|doesn't|don't|won't|without|except|unless"
-    r"|ne|n'|pas|jamais|aucun|aucune|ni|sans|sauf"
-    r"|nicht|kein|keine|keinen|nie|ohne|außer"
-    r"|nunca|ningún|ninguna|sin|salvo"
-    r"|non|mai|nessun|nessuna|senza|tranne)\b",
+    r"|only (?:if|when|where)"                                        # "only if" = "not ... unless"
+    r"|ne|n'|pas|jamais|aucun|aucune|ni|sans|sauf|seulement si|uniquement si|que si"
+    r"|nicht|kein|keine|keinen|keiner|nie|ohne|außer|nur wenn|nur falls"
+    r"|nunca|ningún|ninguna|sin|salvo|solo si|sólo si|excepto"
+    r"|non|mai|nessun|nessuna|senza|tranne|solo se"
+    r"|niet|geen|nooit|zonder|tenzij|pas als|alleen als|enkel als"
+    r"|não|nem|nenhum|nenhuma|sem|exceto|apenas se|só se"
+    r"|inte|ej|ingen|inget|aldrig|utan|förutom|endast om"
+    r"|nie|bez|żaden|żadna|tylko jeśli"
+    r"|değil|yok|hiç|olmadan|sadece"
+    r"|tidak|bukan|tanpa|kecuali|hanya jika)\b",
     re.IGNORECASE)
+_UNREAD_SCRIPT = re.compile(r"[\u0600-\u06FF\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]")  # Arabic, kana, CJK, Hangul
 
 
 def _negative(text: str) -> bool:
-    return bool(_NEGATION.search(text.replace("’", "'")))
+    return bool(_NEGATION.search(text.replace("\u2019", "'")))
 
 
 def _norm(text: str) -> str:
@@ -174,8 +182,8 @@ def gate_figures(i, s, sources, today):
 def gate_negation(i, s, sources, today):
     """A sentence cannot say the opposite of what it quotes: if one is negative (not, ne...pas, nicht, sin...),
     the other must be too. Coarse on purpose: a false refusal sends the question to a human, never the reverse."""
-    if not s.citations:
-        return []
+    if not s.citations or any(_UNREAD_SCRIPT.search(c.quote) for c in s.citations):
+        return []  # a language this gate cannot read: no guess, the other gates still apply
     quotes_negative = any(_negative(c.quote) for c in s.citations)
     if _negative(s.text) and not quotes_negative:
         return ["the sentence is negative but none of its quotes is"]
