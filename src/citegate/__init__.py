@@ -182,12 +182,15 @@ def gate_figures(i, s, sources, today):
 def gate_negation(i, s, sources, today):
     """A sentence cannot say the opposite of what it quotes: if one is negative (not, ne...pas, nicht, sin...),
     the other must be too. Coarse on purpose: a false refusal sends the question to a human, never the reverse."""
-    if not s.citations or any(_UNREAD_SCRIPT.search(c.quote) for c in s.citations):
-        return []  # a language this gate cannot read: no guess, the other gates still apply
-    quotes_negative = any(_negative(c.quote) for c in s.citations)
+    if not s.citations:
+        return []
+    readable = [c for c in s.citations if not _UNREAD_SCRIPT.search(c.quote)]
+    if not readable:  # fail closed: this gate cannot read the quotes' language, so a human checks the sentence
+        return ["negation cannot be checked in the language of the quotes"]
+    quotes_negative = any(_negative(c.quote) for c in readable)
     if _negative(s.text) and not quotes_negative:
         return ["the sentence is negative but none of its quotes is"]
-    if quotes_negative and not _negative(s.text) and all(_negative(c.quote) for c in s.citations):
+    if quotes_negative and not _negative(s.text) and all(_negative(c.quote) for c in readable):
         return ["every quote is negative but the sentence is not"]
     return []
 

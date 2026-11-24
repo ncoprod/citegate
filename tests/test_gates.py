@@ -136,7 +136,10 @@ def test_negation_is_read_in_the_corpus_languages():
     assert check(only_if, src, date(2026, 1, 1)).accepted
 
 
-def test_negation_gate_does_not_guess_on_scripts_it_cannot_read():
+def test_negation_gate_fails_closed_on_scripts_it_cannot_read():
     src = {"m": Source("m", {"p1": "外国企業は日本で消費税の登録が必要です。登録番号を請求書に記載します。"})}
-    s = [Sentence("A foreign company does not need to wait.", [Citation("m", "p1", "外国企業は日本で消費税の登録が必要です。登録番号")])]
-    assert check(s, src, date(2026, 1, 1)).accepted
+    jp = Citation("m", "p1", "外国企業は日本で消費税の登録が必要です。登録番号")
+    assert not check([Sentence("A foreign company does not need to wait.", [jp])], src, date(2026, 1, 1)).accepted
+    src["e"] = Source("e", {"p1": "Registration is required before the first sale to a consumer."})
+    mixed = [Sentence("Registration is not required.", [jp, Citation("e", "p1", "Registration is required before")])]
+    assert not check(mixed, src, date(2026, 1, 1)).accepted  # an unreadable quote cannot mask the readable one

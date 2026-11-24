@@ -14,7 +14,7 @@ the right version of the decision. Here, any answer made of sentences, each citi
 | `valid` | the source has expired |
 | `mode` | the source is `contact_only` (its author did not allow automatic answers) |
 | `figures` | the sentence contains a number (rate, amount, date, also written in words: "twenty") absent from its quotes |
-| `negation` | the sentence is negative (not, ne…pas, nicht, niet, não, inte, "only if"…) while its quotes are not, or the reverse. Quotes in Arabic, Chinese, Japanese or Korean are not judged |
+| `negation` | the sentence is negative (not, ne…pas, nicht, niet, não, inte, "only if"…) while its quotes are not, or the reverse. Quotes in Arabic, Chinese, Japanese or Korean are ignored; if every quote is in those scripts, the sentence is refused (a human checks it) |
 | `whole_sentence` (strict mode only, `STRICT_GATES`) | a quote is cut mid-sentence, which could drop a condition or a date |
 
 **What it does not do:** check that a sentence is a correct reading of its quote. The gates only
