@@ -61,7 +61,7 @@ _NEGATION = re.compile(
     r"\b(not|no|never|none|nor|cannot|can't|isn't|aren't|doesn't|don't|won't|without|except|unless"
     r"|only (?:if|when|where)"                                        # "only if" = "not ... unless"
     r"|ne|n'|pas|jamais|aucun|aucune|ni|sans|sauf|seulement si|uniquement si|que si"
-    r"|nicht|kein|keine|keinen|keiner|nie|ohne|außer|nur wenn|nur falls"
+    r"|nicht|kein|keine|keinen|keiner|nie|ohne|außer|nur,? wenn|nur,? falls"
     r"|nunca|ningún|ninguna|sin|salvo|solo si|sólo si|excepto"
     r"|non|mai|nessun|nessuna|senza|tranne|solo se"
     r"|niet|geen|nooit|zonder|tenzij|pas als|alleen als|enkel als"
@@ -72,6 +72,26 @@ _NEGATION = re.compile(
     r"|tidak|bukan|tanpa|kecuali|hanya jika)\b",
     re.IGNORECASE)
 _UNREAD_SCRIPT = re.compile(r"[\u0600-\u06FF\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]")  # Arabic, kana, CJK, Hangul
+
+
+# A condition or a time limit changes what a rule says: "10% if the recipient holds a certificate", "before 2024".
+# A condition, or a limit in time that ends a rule, changes what it says: "10% if the recipient holds a certificate",
+# "before 2024". A start ("since 2024", "from April") describes the rule in force and is not required. Words that
+# are also common in other senses ("subject to", "after", "voor") are left out: when unsure, this gate accepts, and
+# the other gates and the model's instructions still apply.
+_CONDITION = re.compile(
+    r"\b(if|unless|only|provided that|on condition|except|before|until"
+    r"|si|s'il|s'ils|sauf|seulement|uniquement|à condition|sous réserve|excepté|avant|jusqu"
+    r"|wenn|falls|nur|sofern|soweit|außer|ausgenommen|bis"
+    r"|sólo|salvo|excepto|siempre que|antes de|hasta"
+    r"|purché|tranne|prima|fino a"
+    r"|alleen|tenzij|vóór"
+    r"|apenas|só|desde que|exceto|até)\b",
+    re.IGNORECASE)
+
+
+def _conditional(text: str) -> bool:
+    return bool(_CONDITION.search(text.replace("\u2019", "'")))
 
 
 def _negative(text: str) -> bool:
@@ -195,6 +215,16 @@ def gate_negation(i, s, sources, today):
     return []
 
 
+def gate_conditions(i, s, sources, today):
+    """A sentence cannot drop the condition or the time limit its quotes carry: if every quote it relies on has one
+    ("if", "unless", "only", "before", "until"...), the sentence must keep one too. Coarse like the negation gate,
+    and fails the same way: a refusal sends the sentence back for a repair, then to a human, never the reverse."""
+    readable = [c for c in s.citations if not _UNREAD_SCRIPT.search(c.quote)]
+    if readable and all(_conditional(c.quote) for c in readable) and not _conditional(s.text):
+        return ["every quote carries a condition or a time limit that the sentence drops"]
+    return []
+
+
 _END = ".!?;:"
 
 
@@ -225,6 +255,7 @@ DEFAULT_GATES: dict[str, Gate] = {
     "mode": gate_mode,
     "figures": gate_figures,
     "negation": gate_negation,
+    "conditions": gate_conditions,
 }
 STRICT_GATES: dict[str, Gate] = DEFAULT_GATES | {"whole_sentence": gate_whole_sentence}
 

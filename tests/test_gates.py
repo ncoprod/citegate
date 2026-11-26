@@ -143,3 +143,27 @@ def test_negation_gate_fails_closed_on_scripts_it_cannot_read():
     src["e"] = Source("e", {"p1": "Registration is required before the first sale to a consumer."})
     mixed = [Sentence("Registration is not required.", [jp, Citation("e", "p1", "Registration is required before")])]
     assert not check(mixed, src, date(2026, 1, 1)).accepted  # an unreadable quote cannot mask the readable one
+
+
+def _one(text, quote):
+    src = {"m": Source("m", {"p1": f"{quote} Other text."}, date(2030, 1, 1), "auto")}
+    return check([Sentence(text, [Citation("m", "p1", quote)])], src, date(2026, 1, 1))
+
+
+def test_a_sentence_keeps_the_condition_of_its_quote():
+    q = "The reduced rate applies only if the recipient holds a tax residency certificate."
+    assert not _one("The reduced rate applies.", q).accepted
+    assert _one("The reduced rate applies only if the recipient holds a certificate.", q).accepted
+    assert _one("Le taux réduit s'applique seulement si le bénéficiaire a un certificat de résidence.", q).accepted
+    assert _one("Der ermäßigte Satz gilt nur, wenn ein Ansässigkeitsnachweis vorliegt.", q).accepted
+
+
+def test_a_sentence_keeps_the_time_limit_of_its_quote():
+    q = "Before 2024, payments for software were taxed as royalties."
+    assert not _one("Payments for software are taxed as royalties.", q).accepted
+    assert _one("Avant 2024, les paiements de logiciels étaient imposés comme redevances.", q).accepted
+
+
+def test_an_unconditional_quote_asks_nothing():
+    q = "Payments for software services are taxed as fees for technical services."
+    assert _one("Software services are taxed as fees for technical services.", q).accepted
